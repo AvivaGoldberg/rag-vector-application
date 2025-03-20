@@ -1,0 +1,82 @@
+#! /bin/env python3
+
+# my imports to query stuff...
+from langchain_chroma import Chroma
+from langchain_ollama import OllamaEmbeddings
+from ollama import Client
+
+# SETUP OLLAMA.....................
+# create embedding object... (change host if needed)
+ollama_embeddings = OllamaEmbeddings(
+    model="nomic-embed-text",
+    base_url='http://10.100.200.57:11434'
+)
+
+client = Client(
+    host="http://iss-cs-hp-01.indiansprings.org:11434"
+)
+
+persist_directory = "vectorstore" # Path to your saved Chroma store
+chroma_store = Chroma(
+    embedding_function=ollama_embeddings,
+    persist_directory='vectorstore',
+)
+
+query = input("Enter your prompt: ")
+
+# query = "Tell me about the mayor"
+
+results = chroma_store.similarity_search(query,k=6)
+
+print("\n\n")
+CONTEXT = ""
+i=0
+for result in results:
+    CONTEXT += ("\n--------------------\n")
+    CONTEXT += ("\nChunk: " + str(i))
+    CONTEXT += ("\nPage number: " + str(result.metadata["page"]))
+    CONTEXT += ("\nSource: " + result.metadata["source"])
+    CONTEXT += ("\nSchool year: " + result.metadata["school_year"])
+    CONTEXT += ("\nPage Content: " + result.page_content)
+    CONTEXT += ("\n--------------------\n")
+    i+=1
+
+
+# print(CONTEXT)
+
+TASK = """
+use the following CONTEXT to answer the QUESTION at the end.
+if you do not know the answer, just say that you do not know, do not try to make up any answers to the QUESTION
+if you can get an answer from the CONTEXT provided, answer the QUESTION
+and cite the source and the school_year from the metadata provided.
+"""
+
+prompt = f"""
+
+# TASK: 
+
+{TASK}
+
+# CONTEXT: 
+
+{CONTEXT}
+
+# QUESTION: 
+
+{query}
+
+"""
+print(prompt)
+
+# print(results)
+
+# connect to the llm......
+response = client.chat(
+    model="llama3.2",
+    messages=[{"role": "user", "content": prompt }]
+)
+
+print(response.message.content)
+
+
+
